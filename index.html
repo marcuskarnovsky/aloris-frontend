@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ALORIS</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #f5f5f7;
+    display: flex;
+    justify-content: center;
+    height: 100vh;
+}
+
+.chat-container {
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    box-shadow: 0 0 30px rgba(0,0,0,0.08);
+}
+
+.header {
+    padding: 16px;
+    font-weight: 600;
+    border-bottom: 1px solid #eee;
+}
+
+.messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.message {
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border-radius: 16px;
+    max-width: 80%;
+    line-height: 1.4;
+}
+
+.user {
+    background: #007aff;
+    color: white;
+    align-self: flex-end;
+}
+
+.bot {
+    background: #f0f0f0;
+    align-self: flex-start;
+}
+
+.input-area {
+    display: flex;
+    padding: 12px;
+    border-top: 1px solid #eee;
+}
+
+input {
+    flex: 1;
+    padding: 10px;
+    border-radius: 20px;
+    border: 1px solid #ddd;
+    outline: none;
+}
+
+button {
+    margin-left: 8px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 20px;
+    background: black;
+    color: white;
+    cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="chat-container">
+    <div class="header">ALORIS</div>
+    <div class="messages" id="messages"></div>
+
+    <div class="input-area">
+        <input id="userInput" placeholder="Schreibe deine Nachricht..." />
+        <button onclick="sendMessage()">Senden</button>
+    </div>
+</div>
+
+<script>
+const webhookUrl = "http://178.105.152.154:5678/webhook/coach";
+
+async function sendMessage() {
+    const input = document.getElementById("userInput");
+    const message = input.value.trim();
+    if (!message) return;
+
+    addMessage(message, "user");
+    input.value = "";
+
+    const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            user_id: "web-user",
+            message: message,
+            language: "auto"
+        })
+    });
+
+    const data = await response.text();
+    addMessage(data, "bot");
+}
+
+function addMessage(text, sender) {
+    const messages = document.getElementById("messages");
+    const msg = document.createElement("div");
+    msg.classList.add("message", sender);
+    msg.innerText = text;
+    messages.appendChild(msg);
+    messages.scrollTop = messages.scrollHeight;
+}
+</script>
+
+</body>
+</html>

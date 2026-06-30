@@ -1,153 +1,124 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
-import { createClient } from "@supabase/supabase-js";
+import { OpenAI } from "openai";
+import { buildSystemPrompt } from "@/lib/prompts";
+import { supabase } from "@/lib/supabase";
+import { refineWithClaude } from "@/lib/llm/claudeRefiner";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+const client = new OpenAI({
+  apiKey: process.env.AZURE_OPENAI_API_KEY!,
+  baseURL: "https://aloris-projekt-resource.services.ai.azure.com/openai/v1/",
 });
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Funktion für variable, subtile Hinweise auf das 1:1 Coaching
+function getSubtilerHinweis(): string {
+  const hinweise = [
+    "\n\n--- \n*Manchmal gewinnt ein Anliegen durch das direkte Gespräch an Klarheit. Falls du das Bedürfnis hast, tiefer zu blicken, begleite ich dich gerne auch in einem 1:1.*",
+    "\n\n--- \n*KI bietet gute Impulse, doch systemische Tiefe entfaltet sich oft im Dialog. Lass uns bei Gelegenheit schauen, ob wir dein Thema in einer persönlichen Session weiterführen.*",
+    "\n\n--- \n*Wenn wir hier an einen Punkt gelangen, der mehr Resonanz braucht, denk daran: Ein persönlicher Austausch kann oft Blockaden lösen, die im Text verborgen bleiben.*",
+    "\n\n--- \n*Dein Anliegen entwickelt sich. Wenn du das Gefühl hast, die KI reicht für den nächsten Schritt nicht aus, bin ich für ein tiefergehendes 1:1 Coaching bereit.*",
+    "\n\n--- \n*Systemische Dynamiken zeigen sich oft klarer im Gespräch. Wenn es für dich stimmig ist, können wir das gerne in einem Live-Format vertiefen.*"
+  ];
+  return hinweise[Math.floor(Math.random() * hinweise.length)];
+}
+
+// Findet die letzte Nachricht des Coachees (role: "user") im Verlauf
+function getLastUserMessage(messages: any[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") {
+      return messages[i].content || "";
+    }
+  }
+  return "";
+}
+
+// Ruhige Ausweich-Antworten, falls Azure die Anfrage aus Sicherheitsgründen blockiert
+// (z. B. starke Wortwahl in Kombination mit einem emotional aufgeladenen Thema).
+// Damit der Coachee NIE eine technische Fehlermeldung sieht.
+function getAusweichantwort(): string {
+  const antworten = [
+    "Ich bin gerade kurz hängen geblieben. Magst du das, was du gesagt hast, nochmal in anderen Worten beschreiben?",
+    "Lass uns das nochmal von vorne aufgreifen - was genau passiert in diesem Moment, den du gerade beschrieben hast?",
+    "Ich möchte ganz bei dir bleiben - sag mir nochmal in deinen eigenen Worten, was du gerade am meisten spürst.",
+  ];
+  return antworten[Math.floor(Math.random() * antworten.length)];
+}
 
 export async function POST(req: Request) {
   try {
-    console.log("STEP 1: Request received");
+    const { messages, language, sessionId, lebensradEreignis, lebensradAnlass, lebensradErinnerungFaellig } = await req.json();
 
-    const { session_id, content } = await req.json();
-    console.log("STEP 2: Body parsed:", session_id, content);
+    // System-Prompt basierend auf der gewählten Sprache
+    let systemPrompt = buildSystemPrompt(language);
 
-    if (!session_id || !content) {
-      return NextResponse.json(
-        { error: "Missing session_id or content" },
-        { status: 400 }
-      );
+    // Sonderfall: eine fällige Lebensrad-Erinnerung soll einfühlsam eingewoben werden
+    if (lebensradErinnerungFaellig) {
+      systemPrompt += `\n\n## AKTUELLER MOMENT\nSeit dem letzten Lebensrad ist eine Weile vergangen. Wenn es organisch in dieses Gespräch passt, lade den Coachee einfühlsam dazu ein, gemeinsam nochmal auf sein Lebensrad zu schauen, um zu sehen, wie sich die Dinge seitdem entwickelt haben. Kein Druck, keine Pflicht - eine warme, kurze Einladung. Direkt im Anschluss an deine Antwort erscheint das Lebensrad automatisch für ihn, du musst es nicht selbst technisch ankündigen.`;
     }
 
-    // ✅ 1. Emotion + Belief Analyse
-    const analysisCompletion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `
-You are a psychological analysis system.
+    // Sonderfall: Lebensrad wurde gerade eingereicht oder übersprungen
+    if (lebensradEreignis === "eingereicht" || lebensradEreignis === "uebersprungen") {
+      const istOnboarding = !lebensradAnlass || lebensradAnlass === "onboarding";
+      if (istOnboarding) {
+        systemPrompt += `\n\n## AKTUELLER MOMENT\nDas Lebensrad wurde soeben ${lebensradEreignis === "eingereicht" ? "eingereicht" : "übersprungen"}. Gehe kurz und wertfrei darauf ein (siehe ONBOARDING Punkt 4) und frage danach: "Mit welchem Thema möchtest du heute konkret starten?"`;
+      } else {
+        systemPrompt += `\n\n## AKTUELLER MOMENT\nDas Lebensrad wurde soeben ${lebensradEreignis === "eingereicht" ? "erneut ausgefüllt" : "für jetzt übersprungen"}. Gehe kurz und wertschätzend darauf ein. Frage NICHT erneut nach dem Thema der Sitzung, als wäre es ein Erstgespräch - knüpfe stattdessen organisch an das bisherige Gespräch an, oder frage offen, womit du heute helfen kannst.`;
+      }
+    }
 
-Analyze the user's message and return JSON only:
-
-{
-  "emotional_score": number (0-10),
-  "detected_belief": string or null,
-  "topic": short topic label
-}
-
-Rules:
-- emotional_score = emotional intensity (0 = neutral, 10 = extreme distress)
-- detected_belief = only if a limiting belief is clearly expressed (use exact wording)
-- topic = short 1-3 word label
-- Return valid JSON only. No explanations.
-`
-        },
-        {
-          role: "user",
-          content
-        }
-      ],
-      temperature: 0,
-    });
-
-    const analysisText =
-      analysisCompletion.choices[0].message?.content || "{}";
-
-    let emotional_score: number | null = null;
-    let detected_belief: string | null = null;
-    let topic: string | null = null;
+    let rawReply: string;
+    let vomFilterBlockiert = false;
 
     try {
-      const parsed = JSON.parse(analysisText);
-      emotional_score = parsed.emotional_score ?? null;
-      detected_belief = parsed.detected_belief ?? null;
-      topic = parsed.topic ?? null;
-    } catch (err) {
-      console.error("JSON PARSE ERROR:", err);
+      // API-Aufruf an Azure OpenAI
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o-2",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages
+        ],
+      });
+      rawReply = completion.choices[0].message.content || "Keine Antwort.";
+    } catch (azureFehler: any) {
+      const istContentFilter =
+        azureFehler?.code === "content_filter" || azureFehler?.error?.code === "content_filter";
+
+      if (istContentFilter) {
+        console.error(
+          "Azure Content-Filter ausgelöst:",
+          JSON.stringify(azureFehler?.error?.innererror?.content_filter_result || azureFehler)
+        );
+        rawReply = getAusweichantwort();
+        vomFilterBlockiert = true;
+      } else {
+        throw azureFehler;
+      }
     }
 
-    console.log("✅ Analysis:", emotional_score, detected_belief, topic);
-
-    // ✅ 2. User Message speichern
-    const { error: userInsertError } = await supabase
-      .from("messages")
-      .insert([
-        {
-          session_id,
-          role: "user",
-          content,
-          emotional_score,
-          detected_belief,
-          topic,
-        },
-      ]);
-
-    if (userInsertError) {
-      console.error("USER INSERT ERROR:", userInsertError);
-      return NextResponse.json(
-        { error: userInsertError.message },
-        { status: 500 }
-      );
+    // 1. Claude-Supervision: Systemische Qualität prüfen (überspringen bei Ausweich-Antwort,
+    // da diese bereits feststeht und nicht weiter geprüft werden muss)
+    let finalReply = rawReply;
+    if (!vomFilterBlockiert) {
+      const lastUserMessage = getLastUserMessage(messages);
+      finalReply = await refineWithClaude(rawReply, lastUserMessage);
     }
 
-    console.log("✅ User message stored");
-
-    // ✅ 3. Chat History laden
-    const { data: messages, error: fetchError } = await supabase
-      .from("messages")
-      .select("role, content")
-      .eq("session_id", session_id)
-      .order("created_at", { ascending: true })
-      .limit(20);
-
-    if (fetchError) {
-      console.error("FETCH ERROR:", fetchError);
-      return NextResponse.json(
-        { error: fetchError.message },
-        { status: 500 }
-      );
+    // 2. Subtile Hinweis-Logik:
+    if (messages.length >= 20) {
+      if (Math.random() < 0.15) {
+        finalReply += getSubtilerHinweis();
+      }
     }
 
-    // ✅ 4. AI Antwort generieren
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "You are a helpful coaching assistant." },
-        ...(messages || []),
-      ],
+    // Log in Supabase
+    await supabase.from("chat_logs").insert({
+      session_id: sessionId,
+      messages: [...messages, { role: "assistant", content: finalReply }]
     });
 
-    const reply = completion.choices[0].message?.content || "";
+    return NextResponse.json({ reply: finalReply });
 
-    console.log("✅ AI response generated");
-
-    // ✅ 5. AI Antwort speichern
-    await supabase.from("messages").insert([
-      {
-        session_id,
-        role: "assistant",
-        content: reply,
-      },
-    ]);
-
-    console.log("✅ AI message stored");
-
-    return NextResponse.json({
-      reply,
-    });
-
-  } catch (err: any) {
-    console.error("CRASH:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error("API Fehler:", error);
+    return NextResponse.json({ error: "Fehler bei der Verarbeitung" }, { status: 500 });
   }
 }

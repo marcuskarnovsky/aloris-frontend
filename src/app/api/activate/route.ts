@@ -41,13 +41,16 @@ export async function POST(req: Request) {
       }));
     }
 
-    if (linkError || !linkData) {
+    if (linkError || !linkData || !linkData.user) {
       console.error("Aktivierungs-Link-Fehler:", linkError);
       return NextResponse.json({ error: "Aktivierung fehlgeschlagen." }, { status: 500 });
     }
 
+    const nutzerId = linkData.user.id;
+    const actionLink = linkData.properties.action_link;
+
     await supabaseAdmin.from("profiles").upsert({
-      id: linkData.user.id,
+      id: nutzerId,
       email,
       is_active: true,
       stripe_customer_id: customerId,
@@ -55,7 +58,7 @@ export async function POST(req: Request) {
       preferred_lang: sprache,
     });
 
-    return NextResponse.json({ actionLink: linkData.properties.action_link });
+    return NextResponse.json({ actionLink });
   } catch (error) {
     console.error("Aktivierung-Fehler:", error);
     return NextResponse.json({ error: "Aktivierung fehlgeschlagen." }, { status: 500 });

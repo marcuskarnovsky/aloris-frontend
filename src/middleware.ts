@@ -59,8 +59,6 @@ export async function middleware(request: NextRequest) {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
-        // Nur weiterleiten, wenn der Nutzer auch tatsächlich aktiv ist.
-        // Sonst bleibt er auf /login (z.B. mit ?status=inactive), kein Redirect-Loop.
         const { data: profile } = await supabase
           .from("profiles")
           .select("is_active")

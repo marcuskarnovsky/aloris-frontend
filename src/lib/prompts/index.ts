@@ -1,7 +1,6 @@
 import { LANGUAGE_NAMES } from "./sprachen";
 import { KERN } from "./kern";
 import { ONBOARDING } from "./onboarding";
-import { ARBEITSMODI } from "./arbeitsmodi";
 import { SCHUTZ } from "./schutz";
 import { ABSCHLUSS } from "./abschluss";
 import { METHODENKOMPASS } from "./methodenkompass";
@@ -20,7 +19,6 @@ export function buildSystemPrompt(languageCode: string): string {
     KERN,
     SPRACHE,
     ONBOARDING,
-    ARBEITSMODI,
     SCHUTZ,
     ABSCHLUSS,
     METHODENKOMPASS,

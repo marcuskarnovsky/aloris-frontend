@@ -6,7 +6,7 @@ An der Fuchsenhütte 13
 Deutschland
 
 Kontakt:
-Telefon: [DEINE TELEFONNUMMER EINTRAGEN]
+Telefon: +49 163 7743443
 E-Mail: support@aloris-space.com
 
 Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV:
@@ -29,7 +29,7 @@ An der Fuchsenhütte 13
 Germany
 
 Contact:
-Phone: [DEINE TELEFONNUMMER EINTRAGEN]
+Phone: +49 163 7743443
 Email: support@aloris-space.com
 
 Responsible for the content according to § 18 para. 2 MStV (German State Media Treaty):

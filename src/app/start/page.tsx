@@ -1,13 +1,16 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { t, getStoredLang, isRtl, type UiLang } from "@/lib/i18n";
 
-export default function StartPage() {
+function StartPageInner() {
   const [email, setEmail] = useState("");
   const [plan, setPlan] = useState<"monthly" | "yearly">("monthly");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lang, setLang] = useState<UiLang>("en");
+  const searchParams = useSearchParams();
+  const isFriend = searchParams.get("friend") === "true";
 
   useEffect(() => {
     setLang(getStoredLang());
@@ -25,7 +28,7 @@ export default function StartPage() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, plan }),
+        body: JSON.stringify({ email, plan, friend: isFriend }),
       });
       const data = await res.json();
 
@@ -58,9 +61,14 @@ export default function StartPage() {
       <div style={{ background: "#f2f1ec", padding: "40px", borderRadius: "12px", width: "100%", maxWidth: "420px", boxShadow: "0 4px 20px rgba(0,0,0,0.3)", position: "relative" }}>
 
         <h1 style={{ color: "#16302b", textAlign: "center", marginBottom: "10px" }}>{t(lang, "appName")}</h1>
-        <p style={{ textAlign: "center", color: "#666", marginBottom: "30px", fontSize: "14px" }}>
+        <p style={{ textAlign: "center", color: "#666", marginBottom: "10px", fontSize: "14px" }}>
           {t(lang, "start_tagline")}
         </p>
+        {isFriend && (
+          <p style={{ textAlign: "center", color: "#16302b", marginBottom: "20px", fontSize: "12px", fontWeight: 600 }}>
+            ✦ Freundes-Zugang erkannt
+          </p>
+        )}
 
         <input
           type="email"
@@ -87,5 +95,13 @@ export default function StartPage() {
         {error && <p style={{ color: "#d9534f", marginTop: "15px", textAlign: "center" }}>{error}</p>}
       </div>
     </div>
+  );
+}
+
+export default function StartPage() {
+  return (
+    <Suspense fallback={null}>
+      <StartPageInner />
+    </Suspense>
   );
 }

@@ -3,7 +3,7 @@ import { stripe } from "@/lib/stripe";
 
 export async function POST(req: Request) {
   try {
-    const { email, plan } = await req.json();
+    const { email, plan, friend } = await req.json();
 
     if (!email || !plan) {
       return NextResponse.json({ error: "E-Mail und Plan erforderlich" }, { status: 400 });
@@ -14,10 +14,15 @@ export async function POST(req: Request) {
         ? process.env.STRIPE_PRICE_YEARLY!
         : process.env.STRIPE_PRICE_MONTHLY!;
 
+    // Normaler Kauf: Karte wird immer erfasst (sichert die Abbuchung nach dem Trial).
+    // Freundes-Link (friend === true): Karte wird nur abgefragt, falls tatsächlich etwas fällig ist -
+    // bei einem 100%-Gutschein entfällt die Kartenabfrage dann komplett.
+    const paymentMethodCollection = friend === true ? "if_required" : "always";
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer_email: email,
-      payment_method_collection: "always",
+      payment_method_collection: paymentMethodCollection,
       allow_promotion_codes: true,
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: {

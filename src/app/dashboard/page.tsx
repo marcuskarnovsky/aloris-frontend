@@ -33,7 +33,6 @@ export default function Page() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Versucht zuerst, ein bereits laufendes Gespräch aus dem lokalen Speicher wiederherzustellen.
   useEffect(() => {
     const gespeichert = localStorage.getItem("aloris_chat");
     if (gespeichert) {
@@ -51,10 +50,6 @@ export default function Page() {
     }
   }, []);
 
-  // Lädt Nutzer-ID, Lebensrad-Status und die beim Kauf hinterlegte Sprache.
-  // Ist eine Lebensrad-Erinnerung fällig, hat ein frischer Gesprächsstart Vorrang
-  // vor einem evtl. gespeicherten, Monate alten Gespräch. Sonst: bestehendes
-  // Gespräch behalten, oder neu starten / einmalig nach Sprache fragen.
   useEffect(() => {
     async function ladeNutzer() {
       const { data: authData } = await supabase.auth.getUser();
@@ -113,7 +108,6 @@ export default function Page() {
     scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
   }, [messages, laedt]);
 
-  // Prüft nach jeder Nachricht, ob der Moment für das Lebensrad gekommen ist (Onboarding)
   useEffect(() => {
     if (!bereit || !userId || lebensradStatus === null || laedt) return;
     const userAntworten = messages.filter((m) => m.role === "user").length;
@@ -138,8 +132,6 @@ export default function Page() {
     }
   }
 
-  // Wird nur im seltenen Sonderfall aufgerufen: Coachee tippt seine Sprache frei ein,
-  // wir speichern sie dauerhaft im Profil und starten direkt das Gespräch.
   async function spracheFestlegen() {
     const lang = spracheEingabe.trim();
     if (lang === "") return;
@@ -218,8 +210,6 @@ export default function Page() {
     }
   }
 
-  // Wird aufgerufen, sobald das Lebensrad eingereicht oder übersprungen wurde
-  // (egal ob Onboarding, manuelles Neu-Ausfüllen oder fällige Erinnerung)
   async function weiterNachLebensrad(ereignis: "eingereicht" | "uebersprungen") {
     setZeigeLebensrad(false);
     const anlass = lebensradAnlass;
@@ -276,7 +266,6 @@ export default function Page() {
     }
   }
 
-  // Manuelles Neu-Ausfüllen auf Wunsch, jederzeit über die Einstellungen
   function lebensradManuellOeffnen() {
     setLebensradAnlass("manuell");
     setZeigeLebensrad(true);
@@ -431,7 +420,7 @@ export default function Page() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && senden()}
                   placeholder="Nachricht..."
-                  style={{ flex: 1, padding: "15px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "16px" }}
+                  style={{ flex: 1, padding: "15px", borderRadius: "8px", border: "1px solid #ccc", fontSize: "16px", background: "#ffffff", color: "#1a1a1a", WebkitTextFillColor: "#1a1a1a", colorScheme: "light" }}
                 />
                 <button
                   onClick={senden}

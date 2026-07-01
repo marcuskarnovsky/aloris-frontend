@@ -18,6 +18,7 @@ export async function POST(req: Request) {
       mode: "subscription",
       customer_email: email,
       payment_method_collection: "always",
+      allow_promotion_codes: true,
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: {
         trial_period_days: 7,

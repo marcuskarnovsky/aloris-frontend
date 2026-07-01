@@ -1,7 +1,7 @@
 "use client";
 import { useState, KeyboardEvent, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { t, getStoredLang, setStoredLang, isRtl, SUPPORTED_LANGS, type UiLang } from "@/lib/i18n";
+import { t, getStoredLang, isRtl, type UiLang } from "@/lib/i18n";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -14,14 +14,6 @@ export default function LoginPage() {
     setLang(getStoredLang());
   }, []);
 
-  function changeLang(newLang: UiLang) {
-    setLang(newLang);
-    setStoredLang(newLang);
-  }
-
-  // Falls jemand über einen Einladungs- oder Passwort-Link hier landet
-  // (Hash enthält access_token + refresh_token), Sitzung manuell setzen
-  // und zur Passwort-Seite weiterleiten.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -66,16 +58,6 @@ export default function LoginPage() {
   return (
     <div dir={isRtl(lang) ? "rtl" : "ltr"} style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#16302b" }}>
       <div style={{ background: "#f2f1ec", padding: "40px", borderRadius: "12px", width: "100%", maxWidth: "400px", boxShadow: "0 4px 20px rgba(0,0,0,0.3)", position: "relative" }}>
-
-        <select
-          value={lang}
-          onChange={(e) => changeLang(e.target.value as UiLang)}
-          style={{ position: "absolute", top: "16px", right: "16px", border: "1px solid #ccc", borderRadius: "6px", padding: "4px 6px", fontSize: "12px", background: "#fff", color: "#333" }}
-        >
-          {SUPPORTED_LANGS.map((l) => (
-            <option key={l.code} value={l.code}>{l.label}</option>
-          ))}
-        </select>
 
         <h1 style={{ color: "#16302b", textAlign: "center", marginBottom: "30px" }}>{t(lang, "appName")}</h1>
         <input
